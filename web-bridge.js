@@ -69,15 +69,16 @@
    exportBackup(json){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([json],{type:'application/json'}));a.href=url;a.download='tandzur-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)},
    importBackup(){document.getElementById('importfile')?.click()}
  };
- ready(()=>{
+ (function initFirebaseNow(){
    try{
      if(!C||!C.appId||C.appId.includes('GANTI_'))throw Error('Isi appId aplikasi Web Firebase pada firebase-config.js');
      firebase.initializeApp(C);auth=firebase.auth();db=firebase.firestore();
      auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e=>fail('Sesi login',e));
+     ready(()=>window.TandzurAndroid.appReady());
      auth.onAuthStateChanged(u=>{
        if(!u){stop();role='';user=null;cb('tandzurRoleChanged','blocked','');cb('tandzurCloudUser','','');}
        else if(!user||user.uid!==u.uid)resolveRole(u);
      });
    }catch(e){status('Konfigurasi Firebase Web: '+e.message);window.TANDZUR_WEB_CONFIG_ERROR=e.message}
- });
+ })();
 })();
