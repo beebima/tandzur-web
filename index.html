@@ -88,21 +88,34 @@ input[type=date]{max-width:100%;color-scheme:dark} .listrow label{display:block;
  }
  DB.weekly=weeks;
 })();
-/* TANDZUR v1.3: all production milestones advanced seven days; holidays remain on their real calendar dates. */
-(function advanceProductionOneWeek(){
- const move=d=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()-7);return x.toISOString().slice(0,10)};
- DB.tasks.forEach(t=>{t.date=move(t.date)});
- DB.ledger.forEach(l=>{l.start=move(l.start);l.end=move(l.end)});
- DB.weekly.forEach(w=>{w.date=move(w.date)});
-})();
 const NAV=[['home','⌂','Beranda'],['calendar','▦','Jadwal'],['tools','▤','Alat'],['harvest','◉','Panen'],['holiday','☀','Libur'],['settings','⚙','Pengaturan']];const names=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];const mons=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];const today=()=>{let d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};const fmt=s=>{let [y,m,d]=s.split('-').map(Number);return `${d} ${mons[m-1]} ${y}`};const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const key=t=>[t.date,t.action,t.batch,t.dest].join('|');const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}};let done=read('tandur_done',{}),snooze=read('tandur_snooze',{}),cfg=read('tandur_cfg',{alarm:true,sound:true}),view='home',selected=today(),month=selected.slice(0,7),toolFilter='ALL',chosenTool='';let save=()=>{localStorage.setItem('tandur_holidays',JSON.stringify(holidays));localStorage.setItem('tandur_done',JSON.stringify(done));localStorage.setItem('tandur_snooze',JSON.stringify(snooze));localStorage.setItem('tandur_cfg',JSON.stringify(cfg));if(window.tandzurSyncNative)setTimeout(window.tandzurSyncNative,100)};let holidays=read('tandur_holidays',[]);
+// Migrasi status tugas lama: hanya kunci yang cocok dengan tugas lama dan baru.
+const tandzurShiftLegacyKeys=(records)=>{
+ if(!records||typeof records!=='object'||Array.isArray(records))return records||{};
+ const newKeys=new Set(DB.tasks.map(t=>[t.date,t.action,t.batch,t.dest].join('|')));
+ const oldToNew=new Map();
+ for(const t of DB.tasks){
+  const d=new Date(t.date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-7);
+  oldToNew.set(d.toISOString().slice(0,10)+'|'+t.action+'|'+t.batch+'|'+t.dest,[t.date,t.action,t.batch,t.dest].join('|'));
+ }
+ const result={...records};
+ for(const [k,v] of Object.entries(records)){
+  const dest=oldToNew.get(k);
+  if(dest&&dest!==k&&!newKeys.has(k)){
+   if(!Object.prototype.hasOwnProperty.call(result,dest))result[dest]=v;
+   delete result[k];
+  }
+ }
+ return result;
+};
 (function migrateCompletedDates(){
- if(localStorage.getItem('tandzur_schedule_20261025_migrated'))return;
- const moveKey=k=>{const d=k.slice(0,10);if(!/^\d{4}-\d{2}-\d{2}\|/.test(k))return k;const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()-7);return x.toISOString().slice(0,10)+k.slice(10)};
- done=Object.fromEntries(Object.entries(done).map(([k,v])=>[moveKey(k),v]));
- snooze=Object.fromEntries(Object.entries(snooze).map(([k,v])=>[moveKey(k),v]));
- localStorage.setItem('tandur_done',JSON.stringify(done));localStorage.setItem('tandur_snooze',JSON.stringify(snooze));
- localStorage.setItem('tandzur_schedule_20261025_migrated','1');
+ const marker='tandzur_schedule_20261101_migration_fixed';
+ if(localStorage.getItem(marker)==='1')return;
+ done=tandzurShiftLegacyKeys(done);
+ snooze=tandzurShiftLegacyKeys(snooze);
+ localStorage.setItem('tandur_done',JSON.stringify(done));
+ localStorage.setItem('tandur_snooze',JSON.stringify(snooze));
+ localStorage.setItem(marker,'1');
 })();
 const plusDays=(d,n)=>{let x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
 const span=(a,b)=>Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000)+1;
@@ -272,7 +285,7 @@ window.addEventListener('pageshow',()=>setTimeout(window.tandzurSyncNative,350))
    x.holidays=[...x.holidays.filter(h=>!localHolidayIds.has(h.start+'|'+h.end+'|'+h.name)),...holidays];
    x.cfg={...(x.cfg||{}),...cfg};
   }
-  remoteApplying=true;done=x.done;snooze=x.snooze||{};cfg=x.cfg||cfg;holidays=x.holidays;deadPlants=x.deadPlants||{};persist();initialResolved=true;cloudReady=true;
+  remoteApplying=true;done=tandzurShiftLegacyKeys(x.done);snooze=tandzurShiftLegacyKeys(x.snooze||{});cfg=x.cfg||cfg;holidays=x.holidays;deadPlants=x.deadPlants||{};persist();initialResolved=true;cloudReady=true;
   render();if(window.tandzurSyncNative)window.tandzurSyncNative();remoteApplying=false;
   if(localDirty||localStorage.getItem('tandzur_pending_sync')==='1'){localDirty=true;send()}else {serverVerified=false;state('☁️ Memverifikasi server…');verifyCloud()};
  };
