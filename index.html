@@ -287,7 +287,7 @@ window.addEventListener('pageshow',()=>setTimeout(window.tandzurSyncNative,350))
   }
   remoteApplying=true;done=tandzurShiftLegacyKeys(x.done);snooze=tandzurShiftLegacyKeys(x.snooze||{});cfg=x.cfg||cfg;holidays=x.holidays;deadPlants=x.deadPlants||{};persist();initialResolved=true;cloudReady=true;
   render();if(window.tandzurSyncNative)window.tandzurSyncNative();remoteApplying=false;
-  if(localDirty||localStorage.getItem('tandzur_pending_sync')==='1'){localDirty=true;send()}else {serverVerified=false;state('☁️ Memverifikasi server…');verifyCloud()};
+  if(localDirty||localStorage.getItem('tandzur_pending_sync')==='1'){localDirty=true;send()}else if(payload!==localData()){markLocal();send()}else {serverVerified=false;state('☁️ Memverifikasi server…');verifyCloud()};
  };
  const oldSave=save;
  save=function(){oldSave();localStorage.setItem('tandzur_dead_plants',JSON.stringify(deadPlants));if(remoteApplying)return;markLocal();send()};
